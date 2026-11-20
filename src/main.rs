@@ -50,6 +50,26 @@ async fn remember(instance: &Instance, settings: &Settings) {
 async fn forget(instance: &Instance) {
 	SETTINGS.write().await.remove(&instance.instance_id);
 }
+
+async fn rotate_volume(instance: &Instance, ticks: i16) {
+	if ticks == 0 {
+		return;
+	}
+	let Some(player) = selection::selected().await else {
+		let _ = instance.show_alert().await;
+		return;
+	};
+	let result = tokio::time::timeout(Duration::from_secs(4), async {
+		let conn = Connection::session().await?;
+		let proxy = media::select(&conn, &player).await?;
+		media::adjust_volume(&proxy, ticks).await
+	})
+	.await;
+	if let Err(error) = result {
+		log::warn!("volume dial for '{player}': {error:?}");
+		let _ = instance.show_alert().await;
+	}
+}
 async fn press(instance: &Instance, _: &Settings, action: &str) {
 	if action == "artwork" {
 		return;
@@ -416,6 +436,7 @@ async fn main() -> OpenActionResult<()> {
 	register_action(SeekForwardsAction).await;
 	register_action(VolumeUpAction).await;
 	register_action(VolumeDownAction).await;
+	register_action(VolumeDialAction).await;
 	tokio::spawn(watch_players());
 	run(std::env::args().collect()).await
 }
