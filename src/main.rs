@@ -468,3 +468,29 @@ async fn main() -> OpenActionResult<()> {
 	tokio::spawn(watch_players());
 	run(std::env::args().collect()).await
 }
+
+#[cfg(test)]
+mod volume_feedback_tests {
+	use super::*;
+
+	#[test]
+	fn volume_feedback_shows_percentage_and_matching_bar() {
+		let feedback = volume_feedback(Some(0.734));
+		assert_eq!(feedback["title"], "Volume");
+		assert_eq!(feedback["value"]["value"], "73%");
+		assert_eq!(feedback["indicator"]["value"], 73);
+	}
+
+	#[test]
+	fn volume_feedback_clamps_out_of_range_values() {
+		assert_eq!(volume_feedback(Some(-0.2))["indicator"]["value"], 0);
+		assert_eq!(volume_feedback(Some(1.4))["indicator"]["value"], 100);
+	}
+
+	#[test]
+	fn volume_feedback_marks_unavailable_volume() {
+		let feedback = volume_feedback(None);
+		assert_eq!(feedback["value"]["value"], "n/a");
+		assert_eq!(feedback["indicator"]["value"], 100);
+	}
+}
