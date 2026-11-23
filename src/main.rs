@@ -197,6 +197,7 @@ fn volume_feedback(volume: Option<f64>) -> Value {
 			})
 		}
 		None => json!({
+			"title": "Volume",
 			"value": { "value": "n/a", "color": "#e5b94c" },
 			"indicator": { "value": 100, "bar_fill_c": "#e5b94c" }
 		}),
