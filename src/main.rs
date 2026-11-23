@@ -192,6 +192,7 @@ fn volume_feedback(volume: Option<f64>) -> Value {
 		Some(volume) => {
 			let percent = (volume.clamp(0.0, 1.0) * 100.0).round() as u8;
 			json!({
+				"title": "Volume",
 				"value": { "value": format!("{percent}%"), "color": "#ffffff" },
 				"indicator": { "value": percent, "bar_fill_c": "#3db36b" }
 			})
