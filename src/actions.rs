@@ -73,6 +73,11 @@ impl Action for VolumeDialAction {
 	type Settings = Settings;
 
 	async fn will_appear(&self, instance: &Instance, settings: &Settings) -> OpenActionResult<()> {
+		if instance.controller == "Encoder"
+			&& let Err(error) = instance.set_feedback_layout("layouts/volume.json".to_owned()).await
+		{
+			log::warn!("Failed to set volume dial feedback layout: {error}");
+		}
 		remember(instance, settings).await;
 		Ok(())
 	}
