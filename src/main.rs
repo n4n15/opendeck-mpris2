@@ -8,6 +8,7 @@ use actions::*;
 use base64::{Engine, engine::general_purpose::STANDARD};
 use openaction::*;
 use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
 use std::{collections::HashMap, sync::LazyLock, time::Duration};
 use tokio::sync::RwLock;
 use zbus::Connection;
@@ -38,6 +39,7 @@ const ACTIONS: &[&str] = &[
 	SeekForwardsAction::UUID,
 	VolumeUpAction::UUID,
 	VolumeDownAction::UUID,
+	VolumeDialAction::UUID,
 ];
 
 async fn remember(instance: &Instance, settings: &Settings) {
@@ -102,6 +104,7 @@ struct State {
 	player: String,
 	track: String,
 	art_url: String,
+	volume: Option<f64>,
 }
 async fn state(player: &str) -> anyhow::Result<State> {
 	let conn = Connection::session().await?;
@@ -128,6 +131,7 @@ async fn state(player: &str) -> anyhow::Result<State> {
 		.unwrap_or_default()
 		.to_owned();
 	let track = format!("{:?}", metadata.get("mpris:trackid"));
+	let volume = proxy.get_property::<f64>("Volume").await.ok();
 	Ok(State {
 		player: proxy.destination().to_string(),
 		track,
@@ -136,6 +140,7 @@ async fn state(player: &str) -> anyhow::Result<State> {
 		playback,
 		repeat,
 		shuffle,
+		volume,
 	})
 }
 
@@ -181,6 +186,22 @@ static CONTROL_IMAGES: LazyLock<HashMap<&'static str, String>> = LazyLock::new(|
 	})
 	.collect()
 });
+
+fn volume_feedback(volume: Option<f64>) -> Value {
+	match volume {
+		Some(volume) => {
+			let percent = (volume.clamp(0.0, 1.0) * 100.0).round() as u8;
+			json!({
+				"value": { "value": format!("{percent}%"), "color": "#ffffff" },
+				"indicator": { "value": percent, "bar_fill_c": "#3db36b" }
+			})
+		}
+		None => json!({
+			"value": { "value": "n/a", "color": "#e5b94c" },
+			"indicator": { "value": 100, "bar_fill_c": "#e5b94c" }
+		}),
+	}
+}
 
 async fn watch_players() {
 	let mut last = HashMap::new();
@@ -276,6 +297,11 @@ async fn watch_players() {
 					}
 				} else if *action == ArtworkAction::UUID {
 					let _ = instance.set_title(Some(""), None).await;
+				} else if *action == VolumeDialAction::UUID {
+					let feedback = volume_feedback(current.volume);
+					if let Err(error) = instance.set_feedback(&feedback).await {
+						log::warn!("Failed to update volume dial feedback: {error}");
+					}
 				} else {
 					let _ = instance
 						.set_title(
