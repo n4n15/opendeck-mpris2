@@ -268,7 +268,15 @@ async fn watch_players() {
 				let Some(config) = settings.get(&instance.instance_id) else {
 					continue;
 				};
-				let rendered = (current.clone(), config.clone());
+				let rendered_state = if *action == VolumeDialAction::UUID {
+					current.clone()
+				} else {
+					State {
+						volume: None,
+						..current.clone()
+					}
+				};
+				let rendered = (rendered_state, config.clone());
 				if last.get(&instance.instance_id) == Some(&rendered) {
 					continue;
 				}
