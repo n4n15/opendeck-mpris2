@@ -130,16 +130,12 @@ pub fn next_repeat(current: &str) -> &'static str {
 }
 
 
-pub async fn adjust_volume(proxy: &Proxy<'_>, ticks: i16) -> Result<()> {
-	if ticks == 0 {
-		return Ok(());
-	}
+pub async fn adjust_volume(proxy: &Proxy<'_>, ticks: i16) -> Result<f64> {
 	let current: f64 = proxy.get_property("Volume").await?;
 	let delta = f64::from(ticks) * 0.05;
-	proxy
-		.set_property("Volume", (current + delta).clamp(0.0, 1.0))
-		.await?;
-	Ok(())
+	let volume = (current + delta).clamp(0.0, 1.0);
+	proxy.set_property("Volume", volume).await?;
+	Ok(volume)
 }
 
 pub async fn command(proxy: &Proxy<'_>, action: &str) -> Result<()> {
