@@ -8,6 +8,7 @@ use actions::*;
 use base64::{Engine, engine::general_purpose::STANDARD};
 use openaction::*;
 use serde::{Deserialize, Serialize};
+use serde_json::{Value, json};
 use std::{collections::HashMap, sync::LazyLock, time::Duration};
 use tokio::sync::RwLock;
 use zbus::Connection;
@@ -38,6 +39,7 @@ const ACTIONS: &[&str] = &[
 	SeekForwardsAction::UUID,
 	VolumeUpAction::UUID,
 	VolumeDownAction::UUID,
+	VolumeDialAction::UUID,
 ];
 
 async fn remember(instance: &Instance, settings: &Settings) {
@@ -49,6 +51,38 @@ async fn remember(instance: &Instance, settings: &Settings) {
 }
 async fn forget(instance: &Instance) {
 	SETTINGS.write().await.remove(&instance.instance_id);
+}
+
+async fn rotate_volume(instance: &Instance, ticks: i16) {
+	if ticks == 0 {
+		return;
+	}
+	let Some(player) = selection::selected().await else {
+		let _ = instance.show_alert().await;
+		return;
+	};
+	let result = tokio::time::timeout(Duration::from_secs(4), async {
+		let conn = Connection::session().await?;
+		let proxy = media::select(&conn, &player).await?;
+		let volume = media::adjust_volume(&proxy, ticks).await?;
+		Ok::<f64, anyhow::Error>(volume)
+	})
+	.await;
+	match result {
+		Ok(Ok(volume)) => {
+			if let Err(error) = instance.set_feedback(&volume_feedback(Some(volume))).await {
+				log::warn!("Failed to refresh volume dial feedback: {error}");
+			}
+		}
+		Ok(Err(error)) => {
+			log::warn!("volume dial for '{player}': {error:?}");
+			let _ = instance.show_alert().await;
+		}
+		Err(error) => {
+			log::warn!("volume dial for '{player}' timed out: {error}");
+			let _ = instance.show_alert().await;
+		}
+	}
 }
 async fn press(instance: &Instance, _: &Settings, action: &str) {
 	if action == "artwork" {
@@ -82,6 +116,7 @@ struct State {
 	player: String,
 	track: String,
 	art_url: String,
+	volume: Option<f64>,
 }
 async fn state(player: &str) -> anyhow::Result<State> {
 	let conn = Connection::session().await?;
@@ -108,6 +143,7 @@ async fn state(player: &str) -> anyhow::Result<State> {
 		.unwrap_or_default()
 		.to_owned();
 	let track = format!("{:?}", metadata.get("mpris:trackid"));
+	let volume = proxy.get_property::<f64>("Volume").await.ok();
 	Ok(State {
 		player: proxy.destination().to_string(),
 		track,
@@ -116,6 +152,7 @@ async fn state(player: &str) -> anyhow::Result<State> {
 		playback,
 		repeat,
 		shuffle,
+		volume,
 	})
 }
 
@@ -161,6 +198,24 @@ static CONTROL_IMAGES: LazyLock<HashMap<&'static str, String>> = LazyLock::new(|
 	})
 	.collect()
 });
+
+fn volume_feedback(volume: Option<f64>) -> Value {
+	match volume {
+		Some(volume) => {
+			let percent = (volume.clamp(0.0, 1.0) * 100.0).round() as u8;
+			json!({
+				"title": "Volume",
+				"value": { "value": format!("{percent}%"), "color": "#ffffff" },
+				"indicator": { "value": percent, "bar_fill_c": "#3db36b" }
+			})
+		}
+		None => json!({
+			"title": "Volume",
+			"value": { "value": "n/a", "color": "#e5b94c" },
+			"indicator": { "value": 100, "bar_fill_c": "#e5b94c" }
+		}),
+	}
+}
 
 async fn watch_players() {
 	let mut last = HashMap::new();
@@ -225,7 +280,15 @@ async fn watch_players() {
 				let Some(config) = settings.get(&instance.instance_id) else {
 					continue;
 				};
-				let rendered = (current.clone(), config.clone());
+				let rendered_state = if *action == VolumeDialAction::UUID {
+					current.clone()
+				} else {
+					State {
+						volume: None,
+						..current.clone()
+					}
+				};
+				let rendered = (rendered_state, config.clone());
 				if last.get(&instance.instance_id) == Some(&rendered) {
 					continue;
 				}
@@ -256,6 +319,11 @@ async fn watch_players() {
 					}
 				} else if *action == ArtworkAction::UUID {
 					let _ = instance.set_title(Some(""), None).await;
+				} else if *action == VolumeDialAction::UUID {
+					let feedback = volume_feedback(current.volume);
+					if let Err(error) = instance.set_feedback(&feedback).await {
+						log::warn!("Failed to update volume dial feedback: {error}");
+					}
 				} else {
 					let _ = instance
 						.set_title(
@@ -416,6 +484,33 @@ async fn main() -> OpenActionResult<()> {
 	register_action(SeekForwardsAction).await;
 	register_action(VolumeUpAction).await;
 	register_action(VolumeDownAction).await;
+	register_action(VolumeDialAction).await;
 	tokio::spawn(watch_players());
 	run(std::env::args().collect()).await
+}
+
+#[cfg(test)]
+mod volume_feedback_tests {
+	use super::*;
+
+	#[test]
+	fn volume_feedback_shows_percentage_and_matching_bar() {
+		let feedback = volume_feedback(Some(0.734));
+		assert_eq!(feedback["title"], "Volume");
+		assert_eq!(feedback["value"]["value"], "73%");
+		assert_eq!(feedback["indicator"]["value"], 73);
+	}
+
+	#[test]
+	fn volume_feedback_clamps_out_of_range_values() {
+		assert_eq!(volume_feedback(Some(-0.2))["indicator"]["value"], 0);
+		assert_eq!(volume_feedback(Some(1.4))["indicator"]["value"], 100);
+	}
+
+	#[test]
+	fn volume_feedback_marks_unavailable_volume() {
+		let feedback = volume_feedback(None);
+		assert_eq!(feedback["value"]["value"], "n/a");
+		assert_eq!(feedback["indicator"]["value"], 100);
+	}
 }

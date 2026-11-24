@@ -98,7 +98,7 @@
       "UUID": "com.cooldead.mpris2.repeat",
       "Name": "Repeat",
       "Icon": "icons/repeat_playlist",
-      "Tooltip": "Cycle repeat: Off \u2192 Playlist \u2192 One Song \u2192 Off",
+      "Tooltip": "Cycle repeat: Off → Playlist → One Song → Off",
       "Controllers": [
         "Keypad"
       ],
@@ -208,6 +208,27 @@
           "Image": "icons/volume_down"
         }
       ]
+    },
+    {
+      "UUID": "com.cooldead.mpris2.volumedial",
+      "Name": "Volume Dial",
+      "Icon": "icons/volume_up",
+      "Tooltip": "Turn the Stream Deck + dial to adjust the selected media player volume",
+      "Controllers": [
+        "Encoder"
+      ],
+      "States": [
+        {
+          "Image": "icons/volume_up",
+          "Title": ""
+        }
+      ],
+      "Encoder": {
+        "layout": "$B1",
+        "TriggerDescription": {
+          "Rotate": "Adjust volume"
+        }
+      }
     }
   ],
   "PropertyInspectorPath": "inspector.html"

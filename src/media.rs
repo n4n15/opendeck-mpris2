@@ -129,6 +129,15 @@ pub fn next_repeat(current: &str) -> &'static str {
 	}
 }
 
+
+pub async fn adjust_volume(proxy: &Proxy<'_>, ticks: i16) -> Result<f64> {
+	let current: f64 = proxy.get_property("Volume").await?;
+	let delta = f64::from(ticks) * 0.05;
+	let volume = (current + delta).clamp(0.0, 1.0);
+	proxy.set_property("Volume", volume).await?;
+	Ok(volume)
+}
+
 pub async fn command(proxy: &Proxy<'_>, action: &str) -> Result<()> {
 	let capability = match action {
 		"next" => "CanGoNext",
@@ -168,11 +177,7 @@ pub async fn command(proxy: &Proxy<'_>, action: &str) -> Result<()> {
 			proxy.set_property("Shuffle", !current).await?;
 		}
 		"volumeup" | "volumedown" => {
-			let current: f64 = proxy.get_property("Volume").await?;
-			let delta = if action == "volumeup" { 0.05 } else { -0.05 };
-			proxy
-				.set_property("Volume", (current + delta).clamp(0.0, 1.0))
-				.await?;
+			adjust_volume(proxy, if action == "volumeup" { 1 } else { -1 }).await?;
 		}
 		_ => bail!("Unknown action: {action}"),
 	}

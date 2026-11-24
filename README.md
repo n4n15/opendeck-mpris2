@@ -16,8 +16,13 @@ This plugin lets your Stream Deck control a specific media player instead of whi
 - Shuffle
 - Seek backward / forward 10 seconds
 - Volume down / up 5%
+- Stream Deck + rotary encoder volume control (clockwise / anticlockwise), with live touchstrip percentage and level bar
 - One shared media-player selection for all plugin buttons
 - Automatically reconnects when a selected player is closed and reopened
+
+### Stream Deck + rotary encoder
+
+Add the **Volume Dial** action to one of the Stream Deck + encoders. Turn clockwise to increase the selected player's volume and anticlockwise to decrease it. Each encoder tick changes the volume by 5%. The touchstrip shows the current percentage and a live level bar, including changes made by other applications; the existing **Volume Up** and **Volume Down** keypad actions remain available.
 
 ### Plugin controls
 
