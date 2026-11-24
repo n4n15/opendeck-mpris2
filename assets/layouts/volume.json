@@ -10,16 +10,21 @@
       "alignment": "left"
     },
     {
+      "key": "icon",
+      "type": "pixmap",
+      "rect": [16, 40, 48, 48]
+    },
+    {
       "key": "value",
       "type": "text",
-      "rect": [16, 40, 168, 32],
+      "rect": [76, 40, 108, 32],
       "font": { "size": 24, "weight": 600 },
-      "alignment": "center"
+      "alignment": "right"
     },
     {
       "key": "indicator",
       "type": "bar",
-      "rect": [16, 76, 168, 12],
+      "rect": [76, 74, 108, 12],
       "value": 20,
       "subtype": 4,
       "border_w": 0
