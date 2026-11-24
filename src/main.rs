@@ -64,8 +64,7 @@ async fn rotate_volume(instance: &Instance, ticks: i16) {
 	let result = tokio::time::timeout(Duration::from_secs(4), async {
 		let conn = Connection::session().await?;
 		let proxy = media::select(&conn, &player).await?;
-		media::adjust_volume(&proxy, ticks).await?;
-		let volume = proxy.get_property::<f64>("Volume").await?;
+		let volume = media::adjust_volume(&proxy, ticks).await?;
 		Ok::<f64, anyhow::Error>(volume)
 	})
 	.await;
