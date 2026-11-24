@@ -222,7 +222,13 @@
           "Image": "icons/volume_up",
           "Title": ""
         }
-      ]
+      ],
+      "Encoder": {
+        "layout": "$B1",
+        "TriggerDescription": {
+          "Rotate": "Adjust volume"
+        }
+      }
     }
   ],
   "PropertyInspectorPath": "inspector.html"
