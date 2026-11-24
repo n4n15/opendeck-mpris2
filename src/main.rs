@@ -64,12 +64,25 @@ async fn rotate_volume(instance: &Instance, ticks: i16) {
 	let result = tokio::time::timeout(Duration::from_secs(4), async {
 		let conn = Connection::session().await?;
 		let proxy = media::select(&conn, &player).await?;
-		media::adjust_volume(&proxy, ticks).await
+		media::adjust_volume(&proxy, ticks).await?;
+		let volume = proxy.get_property::<f64>("Volume").await?;
+		Ok::<f64, anyhow::Error>(volume)
 	})
 	.await;
-	if let Err(error) = result {
-		log::warn!("volume dial for '{player}': {error:?}");
-		let _ = instance.show_alert().await;
+	match result {
+		Ok(Ok(volume)) => {
+			if let Err(error) = instance.set_feedback(&volume_feedback(Some(volume))).await {
+				log::warn!("Failed to refresh volume dial feedback: {error}");
+			}
+		}
+		Ok(Err(error)) => {
+			log::warn!("volume dial for '{player}': {error:?}");
+			let _ = instance.show_alert().await;
+		}
+		Err(error) => {
+			log::warn!("volume dial for '{player}' timed out: {error}");
+			let _ = instance.show_alert().await;
+		}
 	}
 }
 async fn press(instance: &Instance, _: &Settings, action: &str) {
